@@ -1,0 +1,37 @@
+node{
+    
+    def buildNumber = BUILD_NUMBER
+    stage("Git Clone"){
+        
+        git url: "https://github.com/rajiva11/DevOpsClassCodes.git", branch: "master"
+    }
+    
+    stage("Maven Clean Package"){
+        
+        def mavenHome= tool name: "MyMaven",type: "maven"
+        
+        sh "${mavenHome}/bin/mvn clean package"
+    }
+    
+    stage("Build Docker Image"){
+        
+        sh "docker build -t rajiva1/addressbookdocker:${buildNumber} ."
+    }
+    
+    stage("Docker Login and Push"){
+        withCredentials([string(credentialsId: 'Docker_Hub_Pwd', variable: 'Docker_Hub_Pwd')]) {
+            sh "docker login -u rajiva1 -p ${Docker_Hub_Pwd}"
+        }
+        
+        sh "docker push rajiva1/addressbookdocker:${buildNumber}"
+    }
+    
+    stage("Deploy Application as Docker Container in Docker Deployment Server"){
+        
+        sshagent(['Docker_Dev_Server_SSH']) {
+            sh "ssh -o StrictHostKeyChecking=no rajiva_rai@10.160.0.44 docker rm -f javawebappcontainer || true"
+            
+            sh "ssh -o StrictHostKeyChecking=no rajiva_rai@10.160.0.44 docker run -d -p 8080:8080 --name javawebappcontainer rajiva1/addressbookdocker:${buildNumber}"
+        }
+    }
+}
